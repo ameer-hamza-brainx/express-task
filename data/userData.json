@@ -1,1 +1,1 @@
-[{"name":"Ali","email":"ali@brainxtech.com","password":"123"},{"name":"Ameer","email":"ameer.hamza@brainxtech.com","password":"123"}]
+[{"name":"Ameer","email":"ameer.hamza@brainxtech.com","password":"123","isVerified":true,"tasks":[{"id":"1","task":"dinner"},{"id":"2","task":"workout"}]},{"name":"Ali","email":"ali@brainxtech.com","password":"123","isVerified":true,"tasks":[]}]
