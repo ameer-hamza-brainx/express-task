@@ -14,6 +14,17 @@ app.use(session({
 
 app.use(express.json());
 
+// function to generate token
+function generateToken(length) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < length; i++) {
+        const randomIndex = Math.floor(Math.random() * characters.length);
+        token += characters.charAt(randomIndex);
+    }
+    return token;
+  }
+
 function readFile()
 {
     let usersjson = fs.readFileSync(filePath,"utf-8");
@@ -59,15 +70,22 @@ function isVerified(req,res,next){
 }
 
 app.get("/",(req,res)=>{
-    res.status(200).send("<h1>Hello</h1>");
+    res.status(200).send("<h1>Home page</h1>");
 });
 
 //Signup api
 
 app.post("/signup",(req,res)=>{
    let users = readFile();
-   users.push(req.body);
-   writeFile(users,"Sucessfully signed up",res);
+   const foundUser = users.find(user => user.email === req.body.email);
+   if(!foundUser)
+   {
+       users.push(req.body);
+       writeFile(users,"Sucessfully signed up",res);
+   }
+   else{
+    res.send("User already exist");
+   }
     
 });
 
@@ -232,6 +250,60 @@ app.get("/getTasks",isLogIn,isVerified,(req,res)=>{
             }
         }
     });
+});
+
+
+app.post("/forgotPassword",(req,res)=>{
+    let users = readFile();
+    const foundUser = users.find(user => user.email === req.body.email);
+    const token = generateToken(16);
+    if(foundUser)
+    {
+        users.forEach(user => {
+            if(user.email === req.body.email)
+            {
+                const expirationTime = new Date();
+                expirationTime.setMinutes(expirationTime.getMinutes() + 2);
+                foundUser.token = {
+                    "key":token,
+                    "expiry":expirationTime
+                }
+            }
+        });
+        writeFile(users,"http://localhost:5000/resetPassword/"+token,res);
+    }
+    else
+    {
+        res.send("user not exist");
+    }
+});
+
+//Reset password
+
+app.post("/resetPassword/:token",(req,res)=>{
+    let users = readFile();
+    let exist = false;
+    
+    // const foundUser = users.find(user => user.token.key === req.body.email);
+    users.forEach(user => {
+        if(user.hasOwnProperty('token') && user.token.key === req.params.token)
+        {
+            exist = true;
+            const dateNow = new Date();
+            const expiryDate = new Date(user.token.expiry);
+            if(dateNow <= expiryDate)
+            {
+                user.password = req.body.password;
+                writeFile(users,"password changed",res);
+                return;
+            }
+            else
+            {
+                res.send("Token Expired");
+            }
+        }
+    });
+    if(!exist){res.send("Invalid token");}
 });
 
 // listening on port

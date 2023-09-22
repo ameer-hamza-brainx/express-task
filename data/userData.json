@@ -1,1 +1,53 @@
-[{"name":"Ameer","email":"ameer.hamza@brainxtech.com","password":"123","isVerified":true,"tasks":[{"id":"1","task":"dinner"},{"id":"3","task":"coffee"},{"id":"4","task":"updated"}]},{"name":"Ali","email":"ali@brainxtech.com","password":"123","isVerified":true,"tasks":[]}]
+[
+    {
+        "name": "Ameer",
+        "email": "ameer.hamza@brainxtech.com",
+        "password": "123",
+        "isVerified": true,
+        "tasks": [
+            {
+                "id": "1",
+                "task": "dinner"
+            },
+            {
+                "id": "3",
+                "task": "coffee"
+            },
+            {
+                "id": "4",
+                "task": "updated"
+            }
+        ],
+        "token": {
+            "key": "sS8kIxoLsCVA2Jxq",
+            "expiry": "2023-09-22T12:40:41.376Z"
+        }
+    },
+    {
+        "name": "Ali",
+        "email": "ali@brainxtech.com",
+        "password": "1234",
+        "isVerified": true,
+        "tasks": [],
+        "token": {
+            "key": "4cHWXtNCOIkK2te5",
+            "expiry": "2023-09-22T12:42:19.953Z"
+        }
+    },
+    {
+        "name": "bilal",
+        "email": "bilal@brainxtech.com",
+        "isVerified": true,
+        "tasks": [
+            {
+                "id": "1",
+                "task": "workout"
+            }
+        ],
+        "token": {
+            "key": "IpXOkNN0MKfmR7Ba",
+            "expiry": "2023-09-22T12:49:44.310Z"
+        },
+        "password": "1234"
+    }
+]
