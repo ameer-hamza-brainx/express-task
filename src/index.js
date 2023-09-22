@@ -4,36 +4,26 @@ const app = express();
 const port = 5000;
 const fs = require('fs');
 const session = require('express-session');
+const filePath = path.join(__dirname+"/../data/userData.json")
 
 app.use(session({
   secret: 'secret_key_here',
   resave: false,
-  saveUninitialized: true,
-  cookie: {
-    maxAge: 30 * 60 * 1000, // 30 minutes
-  }
+  saveUninitialized: true
 }));
 
 app.use(express.json());
-// function middleware(req,res,next){
-//     console.log("global middleware");
-//     next();
-// }
-// app.use(middleware);
-
-
-// middleware to check login
 
 function readFile()
 {
-    let usersjson = fs.readFileSync("./data/userData.json","utf-8");
+    let usersjson = fs.readFileSync(filePath,"utf-8");
     let users = JSON.parse(usersjson);
     return users;
 }
 function writeFile(users,context,res)
 {
     usersjson = JSON.stringify(users);
-    fs.writeFile("./data/userData.json",usersjson,err=>{
+    fs.writeFile(filePath,usersjson,err=>{
         if(err)
         {
             res.status(400).send("Some problem occured");
@@ -166,6 +156,82 @@ app.post("/createTask",isLogIn,isVerified,(req,res)=>{
         }
     });
     
+});
+
+//Task remove API
+
+app.post("/removeTask",isLogIn,isVerified,(req,res)=>{
+    let users = readFile();
+    let taskExist = false;
+    users.forEach(user => {
+        if(user.email === req.session.email)
+        {
+            if(JSON.stringify(user.tasks)==='[]')
+            {
+                res.send("Task not exist");
+            }
+            else
+            {
+                let tasks = user.tasks;
+                tasks.forEach((task,index) => {
+                    if(task.id === req.body.id)
+                    {
+                        taskExist = true;
+                        tasks.splice(index, 1);
+                    }
+                });
+                user.tasks = tasks;
+                taskExist?writeFile(users,"task removed",res):res.send("task not exist");
+            }
+        }
+    });
+});
+//Task update API
+
+app.patch("/updateTask",isLogIn,isVerified,(req,res)=>{
+    let users = readFile();
+    let taskExist = false;
+    users.forEach(user => {
+        if(user.email === req.session.email)
+        {
+            if(JSON.stringify(user.tasks)==='[]')
+            {
+                res.send("Task not exist");
+            }
+            else
+            {
+                let tasks = user.tasks;
+                tasks.forEach(task => {
+                    if(task.id === req.body.id)
+                    {
+                        taskExist = true;
+                        task.task = req.body.updatedTask;
+                    }
+                });
+                user.tasks = tasks;
+                taskExist?writeFile(users,"task updated",res):res.send("task not exist");
+            }
+        }
+    });
+});
+
+// Get tasks
+
+app.get("/getTasks",isLogIn,isVerified,(req,res)=>{
+    let users = readFile();
+    users.forEach(user => {
+        if(user.email === req.session.email)
+        {
+            if(JSON.stringify(user.tasks)==='[]')
+            {
+                res.send("Task not exist");
+            }
+            else
+            {
+                res.send(user.tasks);
+            }
+        }
+    });
 });
 
 // listening on port
