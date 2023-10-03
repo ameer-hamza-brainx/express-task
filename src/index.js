@@ -1,10 +1,13 @@
 const path = require("path");
 const express = require('express');
+require("../db/conn");
 const app = express();
 const port = 5000;
 const fs = require('fs');
 const session = require('express-session');
 const filePath = path.join(__dirname+"/../data/userData.json")
+const User = require("../models/user");
+
 
 app.use(session({
   secret: 'secret_key_here',
@@ -45,6 +48,20 @@ function writeFile(users,context,res)
         }
    });
 }
+// function saveToDb(users,context,res)
+// {
+//     usersjson = JSON.stringify(users);
+//     fs.writeFile(filePath,usersjson,err=>{
+//         if(err)
+//         {
+//             res.status(400).send("Some problem occured");
+//         }
+//         else
+//         {
+//             res.status(200).send(context);
+//         }
+//    });
+// }
 
 function isLogIn(req,res,next){
     if(req.session.loggedIn)
@@ -56,9 +73,8 @@ function isLogIn(req,res,next){
     }
 }
 
-function isVerified(req,res,next){
-    let users = readFile();
-    const foundUser = users.find(user => user.email === req.session.email);
+async function isVerified(req,res,next){
+    const foundUser = await User.findOne({email:req.session.email});
 
     if(foundUser.isVerified)
     {
@@ -75,13 +91,17 @@ app.get("/",(req,res)=>{
 
 //Signup api
 
-app.post("/signup",(req,res)=>{
-   let users = readFile();
-   const foundUser = users.find(user => user.email === req.body.email);
+app.post("/signup",async(req,res)=>{
+
+   const foundUser =await User.where("email").equals(req.body.email);
    if(!foundUser)
    {
-       users.push(req.body);
-       writeFile(users,"Sucessfully signed up",res);
+       const newUser = new User(req.body);
+        newUser.save().then(()=>{
+        res.send("Sucessfully registered")})
+        .catch((e)=>{
+            console.log(e);
+            res.status(400).send("Some problem occured")});
    }
    else{
     res.send("User already exist");
@@ -91,13 +111,11 @@ app.post("/signup",(req,res)=>{
 
 // Login Api
 
-app.post("/signin",(req,res)=>{
-    let users = readFile();
-
-    const foundUser = users.find(user => user.email === req.body.email);
+app.post("/signin",async(req,res)=>{
+    const foundUser =await User.findOne({email:req.body.email});
     if(foundUser)
     {
-        if(foundUser.password === req.body.password)
+        if(foundUser.password == req.body.password)
         {
             req.session.loggedIn = true;
             req.session.email = req.body.email;
@@ -105,7 +123,8 @@ app.post("/signin",(req,res)=>{
         }
         else
         {
-            res.status(401).send("Invalid credentials");
+            res.status(401).send("Invalid password");
+            // console.log(foundUser);
         }
     }
     else
@@ -116,47 +135,45 @@ app.post("/signin",(req,res)=>{
 
 // change password
 
-app.post("/changepassword",isLogIn,isVerified,(req,res)=>{
-    
-    let users = readFile();
-    users.forEach(user => {
-        if(user.email === req.session.email)
-        {
-            user.password = req.body.password;
-        }
-    });
-    writeFile(users,"Password changed sucessfully",res);
+app.post("/changepassword",isLogIn,isVerified,async(req,res)=>{
+    let user = await User.findOne({email:req.session.email});
+    user.password = req.body.password;
+    try{
+        user.save();
+        res.send("password changed");
+    }
+    catch(e){
+        res.status(500).send("problem occured");
+    }
 });
 
-app.get("/verifyEmail",isLogIn,(req,res)=>{
-    let users = readFile();
-    users.forEach(user => {
-        if(user.email === req.session.email)
-        {
-            user.isVerified = true;
-        }
-    });
-    writeFile(users,"Email verified",res);
+app.get("/verifyEmail",isLogIn,async(req,res)=>{
+    let user = await User.findOne({email:req.session.email});
+    user.isVerified = true;
+    user.save().then(()=>{
+        res.send("Email verified")})
+        .catch((e)=>{
+            console.log(e);
+            res.status(500).send("problem occured")});
 });
 
 
 
 // Task create API
-app.post("/createTask",isLogIn,isVerified,(req,res)=>{
-    let users = readFile();
-    users.forEach(user => {
-        if(user.email === req.session.email)
-        {
-            // user.tasks.push(req.body.task);
-            if(JSON.stringify(user.tasks)==='[]')
+app.post("/createTask",isLogIn,isVerified, async(req,res)=>{
+    let user = await User.findOne({email:req.session.email});
+        if(user.tasks.length ===0)
             {
                 let newObj = {
                     "id":"1",
                     "task":req.body.task
                 }
                 user.tasks.push(newObj);
-                writeFile(users,"task added",res);
-                // res.send("empty");
+                user.save().then(()=>{
+                    res.send("task added");
+                }).catch((e)=>{
+                    res.status(400).send("Internal error");
+                })
             }
             else
             {
@@ -169,11 +186,13 @@ app.post("/createTask",isLogIn,isVerified,(req,res)=>{
                     "task":req.body.task
                 }
                 user.tasks.push(newObj);
-                writeFile(users,"task added",res);
+                // writeFile(users,"task added",res);
+                user.save().then(()=>{
+                    res.send("task added");
+                }).catch((e)=>{
+                    res.status(400).send("Internal error");
+                })
             }
-        }
-    });
-    
 });
 
 //Task remove API
@@ -236,41 +255,35 @@ app.patch("/updateTask",isLogIn,isVerified,(req,res)=>{
 // Get tasks
 
 app.get("/getTasks",isLogIn,isVerified,(req,res)=>{
-    let users = readFile();
-    users.forEach(user => {
-        if(user.email === req.session.email)
-        {
-            if(JSON.stringify(user.tasks)==='[]')
-            {
-                res.send("Task not exist");
-            }
-            else
-            {
-                res.send(user.tasks);
-            }
-        }
-    });
+    let user = User.findOne({email:req.session.email});
+    if(user.tasks)
+    {
+        res.send(user.tasks);
+    }
+    else
+    {
+        res.send("Task not exist");
+    }
+    
 });
 
 
-app.post("/forgotPassword",(req,res)=>{
-    let users = readFile();
-    const foundUser = users.find(user => user.email === req.body.email);
+app.post("/forgotPassword",async(req,res)=>{
+    const foundUser = await User.findOne({email:req.body.email});
     const token = generateToken(16);
     if(foundUser)
     {
-        users.forEach(user => {
-            if(user.email === req.body.email)
-            {
-                const expirationTime = new Date();
-                expirationTime.setMinutes(expirationTime.getMinutes() + 2);
-                foundUser.token = {
-                    "key":token,
-                    "expiry":expirationTime
-                }
-            }
-        });
-        writeFile(users,"http://localhost:5000/resetPassword/"+token,res);
+        const expirationTime = new Date();
+        expirationTime.setMinutes(expirationTime.getMinutes() + 2);
+        foundUser.token = {
+            "key":token,
+            "expiry":expirationTime
+        }
+        foundUser.save().then(()=>{
+            res.send("http://localhost:5000/resetPassword/"+token)
+        }).catch((e)=>{
+            console.log(e);
+            res.status(500).send("Some problem occured")});
     }
     else
     {
@@ -280,30 +293,43 @@ app.post("/forgotPassword",(req,res)=>{
 
 //Reset password
 
-app.post("/resetPassword/:token",(req,res)=>{
-    let users = readFile();
-    let exist = false;
-    
-    // const foundUser = users.find(user => user.token.key === req.body.email);
-    users.forEach(user => {
-        if(user.hasOwnProperty('token') && user.token.key === req.params.token)
+app.post("/resetPassword/:token",async(req,res)=>{
+    // let users = readFile();
+    // let exist = false;
+    const foundUser = await User.findOne({"token.key":req.params.token});
+    if(foundUser)
+    {
+        const dateNow = new Date();
+        const expiryDate = new Date(foundUser.token.expiry);
+        if(dateNow <= expiryDate)
         {
-            exist = true;
-            const dateNow = new Date();
-            const expiryDate = new Date(user.token.expiry);
-            if(dateNow <= expiryDate)
-            {
-                user.password = req.body.password;
-                writeFile(users,"password changed",res);
-                return;
-            }
-            else
-            {
-                res.send("Token Expired");
-            }
+            foundUser.password = req.body.password;
+            foundUser.save().then(()=>{
+                res.send("pasword changed");
+            }).catch((e)=>{
+                res.status(500).send(e);
+            })
         }
-    });
-    if(!exist){res.send("Invalid token");}
+        else
+        {
+            res.status(400).send("token expired");
+        }
+    }
+    else
+    {
+        res.send("Invalid token");
+    }
+    // users.forEach(user => {
+    //     if(user.hasOwnProperty('token') && user.token.key === req.params.token)
+    //     {
+    //         exist = true;
+            
+    //         else
+    //         {
+    //             res.send("Token Expired");
+    //         }
+    //     }
+    // });
 });
 
 // listening on port
