@@ -6,10 +6,14 @@ const taskSchema = new mongoose.Schema({
 })
 
 const userSchema = new mongoose.Schema({ 
-    name:String,
-    email:{
+    name:{
         type:String,
         required:true
+    },
+    email:{
+        type:String,
+        required:true,
+        unique:true
     },
     password:String,
     isVerified:{
