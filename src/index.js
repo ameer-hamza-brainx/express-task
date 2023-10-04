@@ -1,11 +1,8 @@
-const path = require("path");
 const express = require('express');
 require("../db/conn");
 const app = express();
 const port = 5000;
-const fs = require('fs');
 const session = require('express-session');
-const filePath = path.join(__dirname+"/../data/userData.json")
 const User = require("../models/user");
 
 
