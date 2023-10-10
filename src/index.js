@@ -4,7 +4,7 @@ const app = express();
 const port = 5000;
 const session = require('express-session');
 const User = require("../models/user");
-
+const cors = require("cors");
 
 app.use(session({
     secret: 'secret_key_here',
@@ -13,6 +13,7 @@ app.use(session({
 }));
 
 app.use(express.json());
+app.use(cors());
 
 // function to generate token
 function generateToken(length) {
@@ -25,43 +26,16 @@ function generateToken(length) {
     return token;
 }
 
-function isLogIn(req, res, next) {
-    if (req.session.loggedIn) {
-        next();
-    }
-    else {
-        res.send("Log In first");
-    }
-}
 
 async function getUser(req, res, next) {
     try {
-        req.user = await User.findOne({ email: req.session.email });
+        req.user = await User.findOne({ email: req.body.email });
     }
     catch (e) {
         res.status(500).send("Internal error");
     }
     next();
 }
-async function isVerified(req, res, next) {
-    try {
-        req.user = await User.findOne({ email: req.session.email });
-    }
-    catch (e) {
-        res.status(500).send("Internal error");
-    }
-
-    if (req.user.isVerified) {
-        next();
-    }
-    else {
-        res.send("Verify your email first");
-    }
-}
-
-app.get("/", (req, res) => {
-    res.status(200).send("<h1>Home page</h1>");
-});
 
 //Signup api
 
@@ -79,7 +53,7 @@ app.post("/signup", async (req, res) => {
                 });
         }
         else {
-            res.send("User already exist");
+            res.send({error:true,errorMsg:"Email already exist!"});
         }
     }
     catch (e) {
@@ -98,14 +72,14 @@ app.post("/signin", async (req, res) => {
             if (foundUser.password == req.body.password) {
                 req.session.loggedIn = true;
                 req.session.email = req.body.email;
-                res.status(200).send("Signin successful");
+                res.status(200).send(foundUser);
             }
             else {
-                res.status(401).send("Invalid password");
+                res.status(401).send({error:true,errorMsg:"Invalid Credentials"});
             }
         }
         else {
-            res.status(401).send("Invalid credentials");
+            res.status(401).send({error:true,errorMsg:"Invalid Credentials"});
         }
     }
     catch (e) {
@@ -116,109 +90,50 @@ app.post("/signin", async (req, res) => {
 
 // change password
 
-app.post("/changepassword", isLogIn, isVerified, getUser, async (req, res) => {
+app.post("/changepassword", getUser, async (req, res) => {
     req.user.password = req.body.password;
     try {
         req.user.save();
-        res.send("password changed");
+        res.status(200).send("password changed");
     }
     catch (e) {
         res.status(500).send("problem occured");
     }
 });
 
-app.get("/verifyEmail", isLogIn, getUser, async (req, res) => {
-    req.user.isVerified = true;
-    req.user.save().then(() => {
-        res.send("Email verified")
-    })
-        .catch((e) => {
-            console.log(e);
-            res.status(500).send("problem occured")
-        });
-});
-
-
-
-// Task create API
-app.post("/createTask", isLogIn, isVerified, getUser, async (req, res) => {
-
-    let newObj = {
-        "task": req.body.task
-    }
-    req.user.tasks.push(newObj);
-    req.user.save().then(() => {
-        res.send("task added");
+app.post("/verifyEmail", async (req, res) => {
+    const foundUser = await User.findOne({ email: req.body.emailState });
+    foundUser.isVerified = true;
+    console.log(foundUser)
+    foundUser.save().then(() => {
+        res.status(200).send({error:false,msg:"Email verified"})
     }).catch((e) => {
-        res.status(400).send("Internal error");
-    })
-});
-
-//Task remove API
-
-app.post("/removeTask", isLogIn, isVerified, getUser, async (req, res) => {
-    let taskExist = false;
-    if (req.user.tasks) {
-        let tasks = req.user.tasks;
-        tasks.forEach((task, index) => {
-            if (task._id == req.body.id) {
-                taskExist = true;
-                tasks.splice(index, 1);
-                req.user.tasks = tasks;
-            }
+            console.log(e);
+            res.status(500).send({error:true,msg:"problem occured"})
         });
-        if (taskExist) {
-            req.user.save().then(() => {
-                res.status(200).send("Task removed");
-            }).catch((e) => {
-                res.status(500).send("Internal error");
-            })
-        }
-        else {
-            res.status(200).send("Task not exist");
-        }
-    }
-    else {
-        res.send("Task not exist");
-    }
 });
+
+
 //Task update API
 
-app.patch("/updateTask", isLogIn, isVerified, getUser, async (req, res) => {
-    let taskExist = false;
-    if (req.user.tasks) {
-        let tasks = req.user.tasks;
-        tasks.forEach((task, index) => {
-            if (task._id == req.body.id) {
-                taskExist = true;
-                task.task = req.body.updatedTask;
-            }
-        });
-        if (taskExist) {
-            req.user.save().then(() => {
-                res.status(200).send("Task Updated");
-            }).catch((e) => {
-                res.status(500).send("Internal error");
-            })
-        }
-        else {
-            res.status(200).send("Task not exist");
-        }
+app.post("/updateTask", async (req, res) => {
+    const foundUser = await User.findOne({ email: req.body.emailState });
+    try{
+        foundUser.tasks = req.body.tasks;
+        foundUser.save();
+        res.status(200).send("tasks changed");
     }
-    else {
-        res.send("Task not exist");
+    catch(e)
+    {
+        res.status(500).send("problem occured")
     }
 });
 
 // Get tasks
 
-app.get("/getTasks", isLogIn, isVerified, getUser, async (req, res) => {
-    if (req.user.tasks) {
-        res.send(req.user.tasks);
-    }
-    else {
-        res.send("Task not exist");
-    }
+app.post("/getTasks", async (req, res) => {
+    const foundUser = await User.findOne({ email: req.body.emailState });
+    res.send(foundUser);
 
 });
 
@@ -234,14 +149,14 @@ app.post("/forgotPassword", async (req, res) => {
             "expiry": expirationTime
         }
         foundUser.save().then(() => {
-            res.send("http://localhost:5000/resetPassword/" + token)
+            res.send({userExist:true,msg:"http://localhost:3000/resetPassword?token=" + token})
         }).catch((e) => {
             console.log(e);
             res.status(500).send("Some problem occured")
         });
     }
     else {
-        res.send("user not exist");
+        res.send({userExist:false,msg:"user not exist"});
     }
 });
 
@@ -253,19 +168,14 @@ app.post("/resetPassword/:token", async (req, res) => {
         const dateNow = new Date();
         const expiryDate = new Date(foundUser.token.expiry);
         if (dateNow <= expiryDate) {
-            foundUser.password = req.body.password;
-            foundUser.save().then(() => {
-                res.send("pasword changed");
-            }).catch((e) => {
-                res.status(500).send(e);
-            })
+            res.status(200).send(foundUser.email);
         }
         else {
-            res.status(400).send("token expired");
+            res.status(400).send({isValid:false,msg:"token expired"});
         }
     }
     else {
-        res.send("Invalid token");
+        res.send({isValid:false,msg:"Invalid token"});
     }
 
 });

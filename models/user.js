@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 
-const taskSchema = new mongoose.Schema({
-    id:Number,
-    task:String
-})
+// const taskSchema = new mongoose.Schema({
+//     id:Number,
+//     task:String
+// })
 
 const userSchema = new mongoose.Schema({ 
     name:{
@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
         type:Boolean,
         default:false
     },
-    tasks:[taskSchema],
+    tasks:Array,
     token:{
         key:String,
         expiry:Date
